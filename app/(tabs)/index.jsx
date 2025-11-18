@@ -1,95 +1,189 @@
 import { View, Text, StyleSheet, Image, Pressable } from 'react-native'
-import React, { useContext } from 'react'
+import React, { useContext, useState, useEffect, useRef } from 'react'
 import { EmblemContext } from '@/app/context/EmblemContext.jsx'
 import defaultTeamIcon from '@/assets/images/club.png'
 import undoIcon from '@/assets/images/undo.png'
 import resetIcon from '@/assets/images/reset.png'
 import pauseIcon from '@/assets/images/pause.png'
 
-const index = () => {
+const Index = () => {
   const { localEmblem, visitorEmblem } = useContext(EmblemContext);
+
+//variables de puntaje
+  const [localScore, setLocalScore] = useState(0);
+  const [visitorScore, setVisitorScore] = useState(0);
+
+//contador principal
+  const [mainSeconds, setMainSeconds] = useState(0);
+  const [mainRunning, setMainRunning] = useState(false);
+  const mainInterval = useRef(null);
+
+  useEffect(() => {
+    if (mainRunning) {
+      mainInterval.current = setInterval(() => {
+        setMainSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      clearInterval(mainInterval.current);
+    }
+
+    return () => clearInterval(mainInterval.current);
+  }, [mainRunning]);
+
+  const formatTime = (sec) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+//tiempo principal
+  const [extraMinutesValue, setExtraMinutesValue] = useState(0); 
+  const [extraSeconds, setExtraSeconds] = useState(0); 
+  const [extraRunning, setExtraRunning] = useState(false);
+  const extraInterval = useRef(null);
+
+  useEffect(() => {
+    if (extraRunning && extraSeconds > 0) {
+      extraInterval.current = setInterval(() => {
+        setExtraSeconds(prev => Math.max(prev - 1, 0));
+      }, 1000);
+    } else {
+      clearInterval(extraInterval.current);
+    }
+
+    return () => clearInterval(extraInterval.current);
+  }, [extraRunning, extraSeconds]);
+
+//funcion para reiniciar todos los contadores
+  const resetAll = () => {
+    setMainRunning(false);
+    setMainSeconds(0);
+
+    setExtraRunning(false);
+    setExtraSeconds(0);
+    setExtraMinutesValue(0);
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.score}>00:00</Text>
+      <Text style={styles.score}>{formatTime(mainSeconds)}</Text>
 
       <View style={styles.teamsRow}>
-
         <View style={styles.team}>
           <Text style={{ textAlign: 'center', fontWeight: '600' }}>Local</Text>
-
           <Image
             style={styles.teamLogo}
             source={localEmblem || defaultTeamIcon}
           />
-
-          <Text style={styles.score}>0</Text>
+          <Text style={styles.score}>{localScore}</Text>
         </View>
 
         <Text style={styles.vsText}>VS</Text>
 
         <View style={styles.team}>
           <Text style={{ textAlign: 'center', fontWeight: '600' }}>Visitante</Text>
-
           <Image
             style={styles.teamLogo}
             source={visitorEmblem || defaultTeamIcon}
           />
-
-          <Text style={styles.score}>0</Text>
+          <Text style={styles.score}>{visitorScore}</Text>
         </View>
-
       </View>
 
       <View style={styles.actions}>
         <View style={styles.goals}>
-          <Pressable style={styles.goalButtons}>
+          <Pressable
+            style={styles.goalButtons}
+            onPress={() => setLocalScore(prev => prev + 1)}
+          >
             <Text style={styles.goalButtonText}>Marcar gol local</Text>
           </Pressable>
-          <Pressable style={styles.undoGoalButtons}>
+
+          <Pressable
+            style={styles.undoGoalButtons}
+            onPress={() => setLocalScore(prev => Math.max(prev - 1, 0))}
+          >
             <Image style={styles.undoGoalIcon} source={undoIcon} />
           </Pressable>
         </View>
 
         <View style={styles.goals}>
-          <Pressable style={styles.goalButtons}>
+          <Pressable
+            style={styles.goalButtons}
+            onPress={() => setVisitorScore(prev => prev + 1)}
+          >
             <Text style={styles.goalButtonText}>Marcar gol visitante</Text>
           </Pressable>
-          <Pressable style={styles.undoGoalButtons}>
+
+          <Pressable
+            style={styles.undoGoalButtons}
+            onPress={() => setVisitorScore(prev => Math.max(prev - 1, 0))}
+          >
             <Image style={styles.undoGoalIcon} source={undoIcon} />
           </Pressable>
         </View>
 
         <View style={styles.timerActions}>
-          <Pressable style={styles.startTimerButton}>
-            <Text style={{ textAlign: 'center', fontWeight: 600, fontSize: 20 }}>Empezar tiempo</Text>
+
+          <Pressable
+            style={styles.startTimerButton}
+            onPress={() => setMainRunning(true)}
+          >
+            <Text style={{ textAlign: 'center', fontWeight: 600, fontSize: 20 }}>
+              Empezar tiempo
+            </Text>
           </Pressable>
+
           <View style={styles.extraTimerActions}>
-            <Pressable style={styles.addremoveTimeButtons}>
+            <Pressable
+              style={styles.addremoveTimeButtons}
+              onPress={() => !extraRunning && setExtraMinutesValue(prev => Math.max(prev - 1, 0))}
+            >
               <Text style={{ textAlign: 'center', fontWeight: 700 }}>-</Text>
             </Pressable>
-            <Text style={styles.extraTime}>00:00</Text>
-            <Pressable style={styles.addremoveTimeButtons}>
+
+            <Text style={styles.extraTime}>
+              {extraRunning
+                ? formatTime(extraSeconds)
+                : `${String(extraMinutesValue).padStart(2, '0')}:00`}
+            </Text>
+
+            <Pressable
+              style={styles.addremoveTimeButtons}
+              onPress={() => !extraRunning && setExtraMinutesValue(prev => prev + 1)}
+            >
               <Text style={{ textAlign: 'center', fontWeight: 700 }}>+</Text>
             </Pressable>
           </View>
+
           <View style={styles.extraTimerActions}>
-            <Pressable style={styles.confirmExtraTimeButton}>
+            <Pressable
+              style={styles.confirmExtraTimeButton}
+              onPress={() => {
+                if (extraMinutesValue === 0) return;
+                setExtraSeconds(extraMinutesValue * 60);
+                setExtraRunning(true);
+              }}
+            >
               <Text style={{ textAlign: 'center', fontWeight: 700 }}>Añadir tiempo extra</Text>
             </Pressable>
-            <Pressable style={styles.undoGoalButtons}>
+
+            <Pressable style={styles.undoGoalButtons} onPress={resetAll}>
               <Image style={styles.undoGoalIcon} source={resetIcon} />
             </Pressable>
-            <Pressable style={styles.pauseTimerButton}>
+
+            <Pressable
+              style={styles.pauseTimerButton}
+              onPress={() => setMainRunning(false)}
+            >
               <Image style={styles.undoGoalIcon} source={pauseIcon} />
             </Pressable>
           </View>
         </View>
       </View>
-
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -147,7 +241,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 10,
     marginRight: 10,
-    justifyContent: 'center'
+    justifyContent: 'center',
   },
 
   goalButtonText: {
@@ -188,19 +282,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'black',
     color: 'white',
     height: 40,
-    width: 70,
+    width: 90,
     borderRadius: 10,
     textAlign: 'center',
+    textAlignVertical: 'center',
+    fontWeight: '700',
+    fontSize: 18,
     marginHorizontal: 10,
   },
 
   confirmExtraTimeButton: {
     backgroundColor: 'orange',
-    textAlign: 'center',
-    justifyContent: 'center',
     padding: 10,
     marginRight: 20,
-    borderRadius: 1000
+    borderRadius: 1000,
+    justifyContent: 'center',
   },
 
   addremoveTimeButtons: {
@@ -211,6 +307,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
   },
+
   pauseTimerButton: {
     backgroundColor: 'orange',
     width: 40,
@@ -218,8 +315,8 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 10,
     justifyContent: 'center',
-    marginLeft: 10
+    marginLeft: 10,
   },
-})
+});
 
-export default index
+export default Index;
