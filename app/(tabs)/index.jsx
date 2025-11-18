@@ -1,10 +1,13 @@
 import { View, Text, StyleSheet, Image, Pressable } from 'react-native'
-import React from 'react'
+import React, { useContext } from 'react'
+import { EmblemContext } from '@/app/context/EmblemContext.jsx'
 import defaultTeamIcon from '@/assets/images/club.png'
 import undoIcon from '@/assets/images/undo.png'
 import resetIcon from '@/assets/images/reset.png'
 
 const index = () => {
+  const { localEmblem, visitorEmblem } = useContext(EmblemContext);
+
   return (
     <View style={styles.container}>
       <Text style={styles.score}>00:00</Text>
@@ -16,7 +19,7 @@ const index = () => {
 
           <Image
             style={styles.teamLogo}
-            source={defaultTeamIcon}
+            source={localEmblem || defaultTeamIcon}
           />
 
           <Text style={styles.score}>0</Text>
@@ -29,7 +32,7 @@ const index = () => {
 
           <Image
             style={styles.teamLogo}
-            source={defaultTeamIcon}
+            source={visitorEmblem || defaultTeamIcon}
           />
 
           <Text style={styles.score}>0</Text>
@@ -196,7 +199,7 @@ const styles = StyleSheet.create({
     borderRadius: 1000
   },
 
-    addremoveTimeButtons: {
+  addremoveTimeButtons: {
     backgroundColor: 'orange',
     width: 40,
     height: 40,
