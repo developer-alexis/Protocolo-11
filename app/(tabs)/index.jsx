@@ -4,6 +4,7 @@ import { EmblemContext } from '@/app/context/EmblemContext.jsx'
 import defaultTeamIcon from '@/assets/images/club.png'
 import undoIcon from '@/assets/images/undo.png'
 import resetIcon from '@/assets/images/reset.png'
+import pauseIcon from '@/assets/images/pause.png'
 
 const index = () => {
   const { localEmblem, visitorEmblem } = useContext(EmblemContext);
@@ -78,6 +79,9 @@ const index = () => {
             </Pressable>
             <Pressable style={styles.undoGoalButtons}>
               <Image style={styles.undoGoalIcon} source={resetIcon} />
+            </Pressable>
+            <Pressable style={styles.pauseTimerButton}>
+              <Image style={styles.undoGoalIcon} source={pauseIcon} />
             </Pressable>
           </View>
         </View>
@@ -206,6 +210,15 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 10,
     justifyContent: 'center',
+  },
+  pauseTimerButton: {
+    backgroundColor: 'orange',
+    width: 40,
+    height: 40,
+    padding: 10,
+    borderRadius: 10,
+    justifyContent: 'center',
+    marginLeft: 10
   },
 })
 
