@@ -5,15 +5,16 @@ import defaultTeamIcon from '@/assets/images/club.png'
 import undoIcon from '@/assets/images/undo.png'
 import resetIcon from '@/assets/images/reset.png'
 import pauseIcon from '@/assets/images/pause.png'
+import BluetoothService from '@/app/services/BluetoothService'
 
 const Index = () => {
   const { localEmblem, visitorEmblem } = useContext(EmblemContext);
 
-//variables de puntaje
+  // Variables de puntaje
   const [localScore, setLocalScore] = useState(0);
   const [visitorScore, setVisitorScore] = useState(0);
 
-//contador principal
+  // Contador principal
   const [mainSeconds, setMainSeconds] = useState(0);
   const [mainRunning, setMainRunning] = useState(false);
   const mainInterval = useRef(null);
@@ -36,7 +37,7 @@ const Index = () => {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
-//tiempo principal
+  // Tiempo extra
   const [extraMinutesValue, setExtraMinutesValue] = useState(0); 
   const [extraSeconds, setExtraSeconds] = useState(0); 
   const [extraRunning, setExtraRunning] = useState(false);
@@ -54,14 +55,67 @@ const Index = () => {
     return () => clearInterval(extraInterval.current);
   }, [extraRunning, extraSeconds]);
 
-//funcion para reiniciar todos los contadores
+  // Función para enviar comando BLE
+  const sendBLECommand = async (command) => {
+    if (BluetoothService.isConnected()) {
+      try {
+        await BluetoothService.sendCommand(command);
+      } catch (error) {
+        console.error('Error enviando comando BLE:', error);
+      }
+    }
+  };
+
+  // Función para incrementar gol local
+  const handleLocalGoal = () => {
+    setLocalScore(prev => prev + 1);
+    sendBLECommand('L'); // Enviar comando al ESP32
+  };
+
+  // Función para decrementar gol local
+  const handleUndoLocalGoal = () => {
+    setLocalScore(prev => {
+      if (prev > 0) {
+        sendBLECommand('l'); // Enviar comando al ESP32
+        return prev - 1;
+      }
+      return prev;
+    });
+  };
+
+  // Función para incrementar gol visitante
+  const handleVisitorGoal = () => {
+    setVisitorScore(prev => prev + 1);
+    sendBLECommand('V'); // Enviar comando al ESP32
+  };
+
+  // Función para decrementar gol visitante
+  const handleUndoVisitorGoal = () => {
+    setVisitorScore(prev => {
+      if (prev > 0) {
+        sendBLECommand('v'); // Enviar comando al ESP32
+        return prev - 1;
+      }
+      return prev;
+    });
+  };
+
+  // Función para iniciar el tiempo
+  const handleStartTimer = () => {
+    setMainRunning(true);
+    sendBLECommand('S'); // Enviar comando al ESP32
+  };
+
+  // Función para reiniciar todos los contadores
   const resetAll = () => {
     setMainRunning(false);
     setMainSeconds(0);
-
     setExtraRunning(false);
     setExtraSeconds(0);
     setExtraMinutesValue(0);
+    setLocalScore(0);
+    setVisitorScore(0);
+    sendBLECommand('R'); // Enviar comando al ESP32
   };
 
   return (
@@ -94,14 +148,14 @@ const Index = () => {
         <View style={styles.goals}>
           <Pressable
             style={styles.goalButtons}
-            onPress={() => setLocalScore(prev => prev + 1)}
+            onPress={handleLocalGoal}
           >
             <Text style={styles.goalButtonText}>Marcar gol local</Text>
           </Pressable>
 
           <Pressable
             style={styles.undoGoalButtons}
-            onPress={() => setLocalScore(prev => Math.max(prev - 1, 0))}
+            onPress={handleUndoLocalGoal}
           >
             <Image style={styles.undoGoalIcon} source={undoIcon} />
           </Pressable>
@@ -110,24 +164,23 @@ const Index = () => {
         <View style={styles.goals}>
           <Pressable
             style={styles.goalButtons}
-            onPress={() => setVisitorScore(prev => prev + 1)}
+            onPress={handleVisitorGoal}
           >
             <Text style={styles.goalButtonText}>Marcar gol visitante</Text>
           </Pressable>
 
           <Pressable
             style={styles.undoGoalButtons}
-            onPress={() => setVisitorScore(prev => Math.max(prev - 1, 0))}
+            onPress={handleUndoVisitorGoal}
           >
             <Image style={styles.undoGoalIcon} source={undoIcon} />
           </Pressable>
         </View>
 
         <View style={styles.timerActions}>
-
           <Pressable
             style={styles.startTimerButton}
-            onPress={() => setMainRunning(true)}
+            onPress={handleStartTimer}
           >
             <Text style={{ textAlign: 'center', fontWeight: 600, fontSize: 20 }}>
               Empezar tiempo
