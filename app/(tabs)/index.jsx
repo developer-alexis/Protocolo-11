@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Image, Pressable } from 'react-native'
+import { View, Text, StyleSheet, Image, Pressable, Alert } from 'react-native'
 import React, { useContext, useState, useEffect, useRef } from 'react'
 import { EmblemContext } from '@/app/context/EmblemContext.jsx'
 import defaultTeamIcon from '@/assets/images/club.png'
@@ -17,10 +17,11 @@ const Index = () => {
   // Contador principal
   const [mainSeconds, setMainSeconds] = useState(0);
   const [mainRunning, setMainRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const mainInterval = useRef(null);
 
   useEffect(() => {
-    if (mainRunning) {
+    if (mainRunning && !isPaused) {
       mainInterval.current = setInterval(() => {
         setMainSeconds(prev => prev + 1);
       }, 1000);
@@ -29,7 +30,7 @@ const Index = () => {
     }
 
     return () => clearInterval(mainInterval.current);
-  }, [mainRunning]);
+  }, [mainRunning, isPaused]);
 
   const formatTime = (sec) => {
     const m = Math.floor(sec / 60);
@@ -69,14 +70,14 @@ const Index = () => {
   // Función para incrementar gol local
   const handleLocalGoal = () => {
     setLocalScore(prev => prev + 1);
-    sendBLECommand('L'); // Enviar comando al ESP32
+    sendBLECommand('L');
   };
 
   // Función para decrementar gol local
   const handleUndoLocalGoal = () => {
     setLocalScore(prev => {
       if (prev > 0) {
-        sendBLECommand('l'); // Enviar comando al ESP32
+        sendBLECommand('l');
         return prev - 1;
       }
       return prev;
@@ -86,14 +87,14 @@ const Index = () => {
   // Función para incrementar gol visitante
   const handleVisitorGoal = () => {
     setVisitorScore(prev => prev + 1);
-    sendBLECommand('V'); // Enviar comando al ESP32
+    sendBLECommand('V');
   };
 
   // Función para decrementar gol visitante
   const handleUndoVisitorGoal = () => {
     setVisitorScore(prev => {
       if (prev > 0) {
-        sendBLECommand('v'); // Enviar comando al ESP32
+        sendBLECommand('v');
         return prev - 1;
       }
       return prev;
@@ -102,25 +103,94 @@ const Index = () => {
 
   // Función para iniciar el tiempo
   const handleStartTimer = () => {
-    setMainRunning(true);
-    sendBLECommand('S'); // Enviar comando al ESP32
+    if (!mainRunning) {
+      setMainRunning(true);
+      setIsPaused(false);
+      sendBLECommand('S');
+    }
+  };
+
+  // Función para pausar/reanudar
+  const handlePauseToggle = () => {
+    if (mainRunning || isPaused) {
+      setIsPaused(prev => !prev);
+      sendBLECommand('P');
+    }
+  };
+
+  // Función para añadir tiempo extra
+  const handleAddExtraTime = () => {
+    const currentMinutes = Math.floor(mainSeconds / 60);
+    
+    // Validar que esté en 45:00 o 90:00
+    if (currentMinutes !== 45 && currentMinutes !== 90) {
+      Alert.alert(
+        'Tiempo extra no disponible',
+        'Solo puedes añadir tiempo extra cuando el reloj marque 45:00 (final del primer tiempo) o 90:00 (final del segundo tiempo).',
+        [{ text: 'Entendido' }]
+      );
+      return;
+    }
+
+    if (extraMinutesValue === 0) {
+      Alert.alert(
+        'Minutos requeridos',
+        'Debes seleccionar al menos 1 minuto de tiempo extra.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Confirmar antes de añadir
+    Alert.alert(
+      'Confirmar tiempo extra',
+      `¿Añadir ${extraMinutesValue} minuto${extraMinutesValue > 1 ? 's' : ''} de tiempo extra?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          onPress: () => {
+            setExtraSeconds(extraMinutesValue * 60);
+            setExtraRunning(true);
+            // Enviar comando E seguido de los minutos
+            sendBLECommand('E' + extraMinutesValue);
+          }
+        }
+      ]
+    );
   };
 
   // Función para reiniciar todos los contadores
   const resetAll = () => {
-    setMainRunning(false);
-    setMainSeconds(0);
-    setExtraRunning(false);
-    setExtraSeconds(0);
-    setExtraMinutesValue(0);
-    setLocalScore(0);
-    setVisitorScore(0);
-    sendBLECommand('R'); // Enviar comando al ESP32
+    Alert.alert(
+      'Reiniciar marcador',
+      '¿Estás seguro de que quieres reiniciar todo el marcador? Se perderán los goles y el tiempo.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Reiniciar',
+          style: 'destructive',
+          onPress: () => {
+            setMainRunning(false);
+            setMainSeconds(0);
+            setIsPaused(false);
+            setExtraRunning(false);
+            setExtraSeconds(0);
+            setExtraMinutesValue(0);
+            setLocalScore(0);
+            setVisitorScore(0);
+            sendBLECommand('R');
+          }
+        }
+      ]
+    );
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.score}>{formatTime(mainSeconds)}</Text>
+      <Text style={styles.score}>
+        {isPaused ? 'PAUSA' : formatTime(mainSeconds)}
+      </Text>
 
       <View style={styles.teamsRow}>
         <View style={styles.team}>
@@ -181,9 +251,10 @@ const Index = () => {
           <Pressable
             style={styles.startTimerButton}
             onPress={handleStartTimer}
+            disabled={mainRunning}
           >
             <Text style={{ textAlign: 'center', fontWeight: 600, fontSize: 20 }}>
-              Empezar tiempo
+              {mainRunning ? 'Tiempo iniciado' : 'Empezar tiempo'}
             </Text>
           </Pressable>
 
@@ -191,6 +262,7 @@ const Index = () => {
             <Pressable
               style={styles.addremoveTimeButtons}
               onPress={() => !extraRunning && setExtraMinutesValue(prev => Math.max(prev - 1, 0))}
+              disabled={extraRunning}
             >
               <Text style={{ textAlign: 'center', fontWeight: 700 }}>-</Text>
             </Pressable>
@@ -204,6 +276,7 @@ const Index = () => {
             <Pressable
               style={styles.addremoveTimeButtons}
               onPress={() => !extraRunning && setExtraMinutesValue(prev => prev + 1)}
+              disabled={extraRunning}
             >
               <Text style={{ textAlign: 'center', fontWeight: 700 }}>+</Text>
             </Pressable>
@@ -212,11 +285,8 @@ const Index = () => {
           <View style={styles.extraTimerActions}>
             <Pressable
               style={styles.confirmExtraTimeButton}
-              onPress={() => {
-                if (extraMinutesValue === 0) return;
-                setExtraSeconds(extraMinutesValue * 60);
-                setExtraRunning(true);
-              }}
+              onPress={handleAddExtraTime}
+              disabled={extraRunning}
             >
               <Text style={{ textAlign: 'center', fontWeight: 700 }}>Añadir tiempo extra</Text>
             </Pressable>
@@ -226,8 +296,12 @@ const Index = () => {
             </Pressable>
 
             <Pressable
-              style={styles.pauseTimerButton}
-              onPress={() => setMainRunning(false)}
+              style={[
+                styles.pauseTimerButton,
+                isPaused && styles.pauseTimerButtonActive
+              ]}
+              onPress={handlePauseToggle}
+              disabled={!mainRunning && !isPaused}
             >
               <Image style={styles.undoGoalIcon} source={pauseIcon} />
             </Pressable>
@@ -369,6 +443,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
     marginLeft: 10,
+  },
+
+  pauseTimerButtonActive: {
+    backgroundColor: '#4CAF50',
   },
 });
 
